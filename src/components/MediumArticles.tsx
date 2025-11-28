@@ -1,8 +1,8 @@
-'use client';
-
-import { motion } from 'framer-motion';
-import { useState, useEffect } from 'react';
+"use client";
+import { motion, useScroll, useTransform } from 'framer-motion';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
+import { FaExternalLinkAlt, FaCalendarAlt, FaTag } from 'react-icons/fa';
 
 interface RawMediumArticle {
   title: string;
@@ -15,83 +15,97 @@ interface RawMediumArticle {
 }
 
 interface MediumArticle extends RawMediumArticle {
-  thumbnail: string; // Will always have a value after processing
+  thumbnail: string;
 }
 
 const MediumArticles = () => {
+  const sectionRef = useRef<HTMLElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ["start end", "end start"]
+  });
+
+  const y = useTransform(scrollYProgress, [0, 1], [0, -100]);
+  const opacity = useTransform(scrollYProgress, [0, 0.2, 0.8, 1], [0, 1, 1, 0]);
+
   const [articles, setArticles] = useState<MediumArticle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeFilter, setActiveFilter] = useState('All');
-  const [selectedArticle, setSelectedArticle] = useState<MediumArticle | null>(null);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [direction, setDirection] = useState(0);
+  const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
 
-  const slideVariants = {
-    enter: (direction: number) => ({
-      x: direction > 0 ? 1000 : -1000,
-      opacity: 0
-    }),
-    center: {
-      zIndex: 1,
-      x: 0,
-      opacity: 1
-    },
-    exit: (direction: number) => ({
-      zIndex: 0,
-      x: direction < 0 ? 1000 : -1000,
-      opacity: 0
-    })
-  };
-
-  const swipeConfidenceThreshold = 10000;
-  const swipePower = (offset: number, velocity: number) => {
-    return Math.abs(offset) * velocity;
-  };
-
-  // Function to extract the first image URL from article content
   const cleanImageUrl = (url: string): string => {
-    // Remove any query parameters and size specifications from Medium CDN URLs
-    if (url.includes('cdn-images-1.medium.com')) {
-      // Get the base URL without size parameters
-      const baseUrl = url.replace(/\/max\/\d+\//, '/');
-      // Use a smaller size to prevent timeout issues
-      return baseUrl.replace(/^(https:\/\/cdn-images-1\.medium\.com\/)/, '$1max/800/');
+    if (!url) return '';
+    
+    // Handle Medium CDN URLs
+    if (url.includes('cdn-images-1.medium.com') || url.includes('miro.medium.com')) {
+      // Remove size parameters and add a reasonable size
+      let cleaned = url.replace(/\/max\/\d+\//, '/');
+      cleaned = cleaned.replace(/\/w+\d+\//, '/');
+      
+      // Ensure we have a size parameter for Medium CDN
+      if (cleaned.includes('cdn-images-1.medium.com') && !cleaned.includes('/max/')) {
+        cleaned = cleaned.replace('cdn-images-1.medium.com/', 'cdn-images-1.medium.com/max/800/');
+      }
+      
+      return cleaned;
     }
+    
     return url;
   };
 
-  const extractImageFromContent = (content: string): string | null => {
+  const extractImageFromContent = (content: string, description?: string): string | null => {
     try {
-      // Try to find the first good image source
       const imgSources: string[] = [];
+      
+      // Try to extract from og:image meta tag
+      const ogImageMatch = content.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
+      if (ogImageMatch && ogImageMatch[1]) {
+        imgSources.push(ogImageMatch[1]);
+      }
 
-      // Look for og:image meta tag
-      const ogImageMatch = content.match(/<meta property="og:image" content="([^"]+)"/);
-      if (ogImageMatch) imgSources.push(ogImageMatch[1]);
+      // Try to extract from description if provided
+      if (description) {
+        const descImgMatch = description.match(/https?:\/\/[^\s<>"]+\.(jpg|jpeg|png|gif|webp)/i);
+        if (descImgMatch) {
+          imgSources.push(descImgMatch[0]);
+        }
+      }
 
-      // Look for figure images
-      const figureMatches = content.match(/<figure>.*?<img[^>]+src="([^">]+)".*?<\/figure>/g);
+      // Extract from figure tags
+      const figureMatches = content.match(/<figure[^>]*>[\s\S]*?<img[^>]+src=["']([^"']+)["'][\s\S]*?<\/figure>/gi);
       if (figureMatches) {
         figureMatches.forEach(figure => {
-          const imgMatch = figure.match(/src="([^">]+)"/);
-          if (imgMatch) imgSources.push(imgMatch[1]);
+          const imgMatch = figure.match(/src=["']([^"']+)["']/i);
+          if (imgMatch && imgMatch[1]) {
+            imgSources.push(imgMatch[1]);
+          }
         });
       }
 
-      // Look for any img tags
-      const imgMatches = content.match(/<img[^>]+src="([^">]+)"/g);
+      // Extract from any img tags
+      const imgMatches = content.match(/<img[^>]+src=["']([^"']+)["']/gi);
       if (imgMatches) {
         imgMatches.forEach(img => {
-          const srcMatch = img.match(/src="([^">]+)"/);
-          if (srcMatch) imgSources.push(srcMatch[1]);
+          const srcMatch = img.match(/src=["']([^"']+)["']/i);
+          if (srcMatch && srcMatch[1]) {
+            imgSources.push(srcMatch[1]);
+          }
         });
       }
 
       // Filter and clean URLs
       const validImages = imgSources
-        .filter(url => url.startsWith('https://'))
+        .filter(url => {
+          if (!url) return false;
+          // Must be HTTPS
+          if (!url.startsWith('https://')) return false;
+          // Must be an image URL
+          if (!/\.(jpg|jpeg|png|gif|webp)/i.test(url) && !url.includes('cdn-images') && !url.includes('miro.medium')) return false;
+          // Not too long
+          if (url.length > 500) return false;
+          return true;
+        })
         .map(cleanImageUrl)
-        .filter(url => url.length < 250); // Avoid extremely long URLs
+        .filter(url => url.length > 0);
 
       return validImages[0] || null;
     } catch (error) {
@@ -103,21 +117,66 @@ const MediumArticles = () => {
   useEffect(() => {
     const fetchArticles = async () => {
       try {
-        // Replace with your Medium RSS feed URL (add your Medium username)
         const response = await fetch(
           `https://api.rss2json.com/v1/api.json?rss_url=https://medium.com/feed/@yashspatil4779`
         );
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch articles');
+        }
+        
         const data: { items: RawMediumArticle[] } = await response.json();
         
-        // Process articles to ensure we have images
-        const processedArticles: MediumArticle[] = data.items.map(article => ({
-          ...article,
-          thumbnail: article.thumbnail || extractImageFromContent(article.content) || '/images/default-article.jpg'
-        }));
+        if (!data.items || !Array.isArray(data.items)) {
+          console.error('Invalid data format:', data);
+          setIsLoading(false);
+          return;
+        }
+        
+        const processedArticles: MediumArticle[] = data.items.map((article, index) => {
+          // Try multiple sources for thumbnail
+          let thumbnail = article.thumbnail;
+          
+          // Debug logging
+          if (index < 3) {
+            console.log(`Article ${index + 1}:`, {
+              title: article.title.substring(0, 50),
+              hasThumbnail: !!thumbnail,
+              thumbnail: thumbnail?.substring(0, 100),
+              hasContent: !!article.content,
+              contentLength: article.content?.length
+            });
+          }
+          
+          // If no thumbnail, try extracting from content
+          if (!thumbnail || thumbnail === '' || thumbnail === 'null' || thumbnail === 'undefined') {
+            const extracted = extractImageFromContent(article.content || '', article.description || '');
+            if (extracted) {
+              thumbnail = extracted;
+              if (index < 3) console.log(`Extracted image for article ${index + 1}:`, extracted);
+            }
+          }
+          
+          // Clean the URL
+          if (thumbnail && thumbnail !== '/images/default-article.jpg') {
+            thumbnail = cleanImageUrl(thumbnail);
+          }
+          
+          // Final fallback
+          if (!thumbnail || thumbnail === '' || thumbnail === 'null' || thumbnail === 'undefined') {
+            thumbnail = '/images/default-article.jpg';
+          }
+          
+          return {
+            ...article,
+            thumbnail
+          };
+        });
         
         setArticles(processedArticles);
       } catch (error) {
         console.error('Error fetching Medium articles:', error);
+        setArticles([]);
       } finally {
         setIsLoading(false);
       }
@@ -126,15 +185,6 @@ const MediumArticles = () => {
     fetchArticles();
   }, []);
 
-  // Get all unique categories
-  const allCategories = ['All', ...new Set(articles.flatMap(article => article.categories))];
-
-  // Filter articles based on selected category
-  const filteredArticles = activeFilter === 'All'
-    ? articles
-    : articles.filter(article => article.categories.includes(activeFilter));
-
-  // Function to truncate text and add ellipsis
   const truncateText = (text: string, maxLength: number) => {
     const strippedText = text.replace(/<[^>]+>/g, '');
     return strippedText.length > maxLength
@@ -142,7 +192,6 @@ const MediumArticles = () => {
       : strippedText;
   };
 
-  // Format date to be more readable
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -153,36 +202,91 @@ const MediumArticles = () => {
   };
 
   return (
-    <section id="blog" className="py-20 bg-gradient-to-b from-gray-900 to-black relative">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent" />
-      
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+    <section 
+      ref={sectionRef}
+      id="blog" 
+      className="py-32 relative overflow-hidden min-h-screen flex items-center"
+    >
+      {/* Animated background */}
+      <div className="absolute inset-0 overflow-hidden">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          className="absolute top-1/4 left-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"
+          style={{ y }}
+          animate={{
+            scale: [1, 1.3, 1],
+            x: [0, 100, 0],
+          }}
+          transition={{
+            duration: 20,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+        />
+        <motion.div
+          className="absolute bottom-1/4 right-0 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"
+          style={{ y: useTransform(scrollYProgress, [0, 1], [0, 100]) }}
+          animate={{
+            scale: [1, 1.4, 1],
+            x: [0, -100, 0],
+          }}
+          transition={{
+            duration: 25,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+        />
+      </div>
+
+      <motion.div 
+        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full"
+        style={{ opacity }}
+      >
+        {/* Section Header */}
+        <motion.div
+          initial={{ opacity: 0, y: 50 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="text-center mb-16"
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 0.8 }}
+          className="text-center mb-20"
         >
-          <h2 className="text-4xl sm:text-5xl font-bold text-white mb-4 relative inline-block">
-            Latest Articles
-            <motion.div
-              className="absolute -bottom-2 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-500"
-              initial={{ width: "0%" }}
-              whileInView={{ width: "100%" }}
+          <motion.h2 
+            className="text-5xl sm:text-7xl font-bold mb-6 relative inline-block"
+            initial={{ opacity: 0, scale: 0.8 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+              Latest Articles
+            </span>
+            <motion.span
+              className="absolute -bottom-4 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"
+              initial={{ width: "0%", scaleX: 0 }}
+              whileInView={{ width: "100%", scaleX: 1 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.8, delay: 0.2 }}
+              transition={{ duration: 1, delay: 0.3 }}
             />
-          </h2>
-          <p className="text-gray-400 max-w-2xl mx-auto mt-4">
+          </motion.h2>
+          <motion.p 
+            className="text-xl text-gray-400 max-w-2xl mx-auto"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.5 }}
+          >
             Sharing insights and experiences through technical writing
-          </p>
+          </motion.p>
         </motion.div>
 
         {isLoading ? (
           <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            <motion.div
+              className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full"
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            />
           </div>
-        ) : (
+        ) : articles.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {articles.map((article, index) => (
               <motion.a
@@ -190,217 +294,170 @@ const MediumArticles = () => {
                 href={article.link}
                 target="_blank"
                 rel="noopener noreferrer"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0, y: 50, rotateX: -15 }}
+                whileInView={{ opacity: 1, y: 0, rotateX: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                className="group"
+                transition={{ 
+                  duration: 0.6,
+                  delay: index * 0.1,
+                  type: "spring",
+                  stiffness: 100,
+                  damping: 15,
+                }}
+                className="group relative perspective-1000"
               >
-                <div className="bg-gray-800/80 backdrop-blur-sm rounded-lg overflow-hidden transform transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-blue-500/20">
-                  <div className="relative h-48">
-                    <Image
-                      src={article.thumbnail || '/images/default-article.jpg'}
-                      alt={article.title}
-                      fill
-                      className="object-cover transition-transform duration-300 group-hover:scale-110"
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                      onError={(e) => {
-                        // @ts-ignore - typescript doesn't know about currentTarget.src
-                        e.currentTarget.src = '/images/default-article.jpg';
-                      }}
-                      unoptimized // Skip image optimization for external URLs
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent opacity-60" />
-                  </div>
-                  
-                  <div className="p-6">
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {article.categories.slice(0, 3).map((category) => (
-                        <span
+                {/* Glow effect */}
+                <motion.div
+                  className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-purple-500 rounded-3xl blur opacity-0 group-hover:opacity-30 transition-opacity duration-300"
+                />
+
+                {/* Card */}
+                <div className="relative glass-strong rounded-3xl overflow-hidden border border-white/10 h-full flex flex-col transform-3d hover:border-white/30 transition-all">
+                  {/* Image */}
+                  <div className="relative h-48 overflow-hidden bg-gradient-to-br from-gray-800 via-gray-700 to-gray-900">
+                    {!imageErrors.has(article.link) && article.thumbnail && article.thumbnail !== '/images/default-article.jpg' ? (
+                      <motion.div
+                        animate={{
+                          scale: [1, 1.05, 1],
+                        }}
+                        transition={{
+                          duration: 3,
+                          repeat: Infinity,
+                          ease: "easeInOut",
+                        }}
+                        className="relative w-full h-full"
+                      >
+                        <img
+                          src={article.thumbnail}
+                          alt={article.title}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            console.log('Image failed to load:', article.thumbnail);
+                            setImageErrors(prev => new Set(prev).add(article.link));
+                            const target = e.currentTarget;
+                            // Try default image first
+                            if (target.src !== '/images/default-article.jpg') {
+                              target.src = '/images/default-article.jpg';
+                            } else {
+                              // If default also fails, hide image
+                              target.style.display = 'none';
+                            }
+                          }}
+                          onLoad={() => {
+                            console.log('Image loaded successfully:', article.thumbnail);
+                          }}
+                          loading="lazy"
+                          crossOrigin="anonymous"
+                        />
+                      </motion.div>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center relative">
+                        {/* Gradient background */}
+                        <div className={`absolute inset-0 bg-gradient-to-br ${
+                          index % 3 === 0 ? 'from-blue-600/20 to-purple-600/20' :
+                          index % 3 === 1 ? 'from-purple-600/20 to-pink-600/20' :
+                          'from-pink-600/20 to-blue-600/20'
+                        }`} />
+                        {/* Icon */}
+                        <div className="relative z-10 text-6xl opacity-50">
+                          📝
+                        </div>
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent" />
+                    
+                    {/* Categories */}
+                    <div className="absolute top-4 left-4 flex flex-wrap gap-2">
+                      {article.categories.slice(0, 2).map((category) => (
+                        <motion.span
                           key={category}
-                          className="px-2 py-1 text-xs bg-blue-500/10 text-blue-400 rounded-full"
+                          className="px-3 py-1 glass rounded-full text-xs font-semibold text-white backdrop-blur-md"
+                          initial={{ opacity: 0, scale: 0 }}
+                          whileInView={{ opacity: 1, scale: 1 }}
+                          viewport={{ once: true }}
+                          whileHover={{ scale: 1.1 }}
                         >
                           {category}
-                        </span>
+                        </motion.span>
                       ))}
                     </div>
-                    
-                    <h3 className="text-xl font-semibold text-white mb-2 line-clamp-2">
+                  </div>
+                  
+                  {/* Content */}
+                  <div className="p-6 flex-1 flex flex-col">
+                    <motion.h3 
+                      className="text-xl font-bold text-white mb-3 line-clamp-2 group-hover:text-blue-400 transition-colors"
+                      whileHover={{ scale: 1.02 }}
+                    >
                       {article.title}
-                    </h3>
+                    </motion.h3>
                     
-                    <p className="text-gray-400 mb-4 line-clamp-3">
-                      {truncateText(article.content, 150)}
+                    <p className="text-gray-400 mb-4 line-clamp-3 flex-1">
+                      {truncateText(article.content, 120)}
                     </p>
                     
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-blue-400">
-                        {formatDate(article.pubDate)}
-                      </span>
-                      <span className="text-purple-400 group-hover:translate-x-2 transition-transform duration-300">
-                        Read more →
-                      </span>
+                    <div className="flex justify-between items-center mt-auto pt-4 border-t border-white/10">
+                      <div className="flex items-center gap-2 text-sm text-gray-400">
+                        <FaCalendarAlt className="w-4 h-4" />
+                        <span>{formatDate(article.pubDate)}</span>
+                      </div>
+                      <motion.span 
+                        className="text-blue-400 flex items-center gap-2 group-hover:translate-x-2 transition-transform duration-300"
+                        whileHover={{ x: 5 }}
+                      >
+                        Read
+                        <FaExternalLinkAlt className="w-4 h-4" />
+                      </motion.span>
                     </div>
                   </div>
+
+                  {/* Shine effect */}
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent pointer-events-none"
+                    animate={{
+                      x: ['-200%', '200%'],
+                    }}
+                    transition={{
+                      duration: 3,
+                      repeat: Infinity,
+                      repeatDelay: 2,
+                      ease: "easeInOut",
+                    }}
+                    style={{
+                      transform: 'skewX(-45deg)',
+                    }}
+                  />
                 </div>
               </motion.a>
             ))}
           </div>
-        )}
-
-        {!isLoading && articles.length === 0 && (
+        ) : (
           <div className="text-center text-gray-400 py-12">
-            No articles found. Check back soon!
+            <p className="text-lg">No articles found. Check back soon!</p>
           </div>
         )}
 
+        {/* View All Button */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
+          transition={{ duration: 0.8 }}
           className="text-center mt-12"
         >
-          <a
+          <motion.a
             href="https://medium.com/@yashspatil4779"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-medium rounded-full hover:scale-105 transition-transform duration-300"
+            className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white font-semibold rounded-full hover:scale-105 transition-transform duration-300"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
-            View All Articles
-            <svg
-              className="ml-2 w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M13 7l5 5m0 0l-5 5m5-5H6"
-              />
-            </svg>
-          </a>
+            <span>View All Articles</span>
+            <FaExternalLinkAlt />
+          </motion.a>
         </motion.div>
-
-        {/* Article Modal */}
-        {selectedArticle && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/70 backdrop-blur-sm"
-            onClick={() => setSelectedArticle(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              transition={{ type: "spring", damping: 20 }}
-              className="relative w-full max-w-4xl bg-gray-800 rounded-xl shadow-2xl overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <motion.button
-                className="absolute top-4 right-4 p-2 rounded-full bg-gray-700/50 text-white hover:bg-gray-700 transition-colors"
-                onClick={() => setSelectedArticle(null)}
-                whileHover={{ scale: 1.1, rotate: 90 }}
-                whileTap={{ scale: 0.9 }}
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </motion.button>
-
-              <div className="relative h-64 sm:h-96">
-                <Image
-                  src={selectedArticle.thumbnail || '/images/default-article.jpg'}
-                  alt={selectedArticle.title}
-                  fill
-                  className="object-cover"
-                  sizes="100vw"
-                  onError={(e) => {
-                    // @ts-ignore - typescript doesn't know about currentTarget.src
-                    e.currentTarget.src = '/images/default-article.jpg';
-                  }}
-                  unoptimized // Skip image optimization for external URLs
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent" />
-              </div>
-
-              <div className="p-6 sm:p-8">
-                <motion.div 
-                  className="flex flex-wrap gap-2 mb-4"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                >
-                  {selectedArticle.categories.map((category) => (
-                    <span
-                      key={category}
-                      className="px-3 py-1 text-sm bg-blue-500/10 text-blue-400 rounded-full"
-                    >
-                      {category}
-                    </span>
-                  ))}
-                </motion.div>
-
-                <motion.h2
-                  className="text-2xl sm:text-3xl font-bold text-white mb-4"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 }}
-                >
-                  {selectedArticle.title}
-                </motion.h2>
-
-                <motion.p
-                  className="text-gray-300 mb-6 leading-relaxed"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.4 }}
-                >
-                  {truncateText(selectedArticle.content, 300)}
-                </motion.p>
-
-                <motion.div
-                  className="flex justify-between items-center"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.5 }}
-                >
-                  <span className="text-blue-400">
-                    {formatDate(selectedArticle.pubDate)}
-                  </span>
-                  <motion.a
-                    href={selectedArticle.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-medium rounded-full"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    Read Full Article
-                    <svg
-                      className="ml-2 w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M13 7l5 5m0 0l-5 5m5-5H6"
-                      />
-                    </svg>
-                  </motion.a>
-                </motion.div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </div>
+      </motion.div>
     </section>
   );
 };

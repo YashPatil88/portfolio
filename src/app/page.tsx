@@ -6,15 +6,13 @@ import About from '../components/About';
 import Contact from '../components/Contact';
 import Technologies from '../components/Technologies';
 import MediumArticles from '../components/MediumArticles';
-import ParticleBackground from '../components/ParticleBackground';
 import ScrollProgress from '../components/ScrollProgress';
 
 export default function Home() {
   return (
-    <main className="bg-black min-h-screen">
+  <main className="min-h-screen relative">
       {/* Fixed elements */}
       <ScrollProgress />
-      <ParticleBackground />
       <Navbar />
 
       {/* Main content */}

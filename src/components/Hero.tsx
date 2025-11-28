@@ -1,7 +1,7 @@
 "use client";
-import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
-import { FaGithub, FaLinkedin, FaEnvelope, FaCode, FaBook } from 'react-icons/fa';
-import { useRef, useState, useEffect } from 'react';
+import { motion, useScroll, useTransform } from 'framer-motion';
+import { FaGithub, FaLinkedin, FaEnvelope } from 'react-icons/fa';
+import { useRef } from 'react';
 import Image from 'next/image';
 
 const Hero = () => {
@@ -13,225 +13,326 @@ const Hero = () => {
 
   const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
   const scale = useTransform(scrollYProgress, [0, 0.5], [1, 0.8]);
-  const y = useTransform(scrollYProgress, [0, 0.5], [0, 100]);
-
-  const titleVariants = {
-    hidden: { opacity: 0, y: -20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.6,
-        staggerChildren: 0.1
-      }
-    }
-  };
-
-  const letterVariants = {
-    hidden: { opacity: 0, y: 50 },
-    visible: {
-      opacity: 1,
-      y: 0
-    }
-  };
+  const yTransform = useTransform(scrollYProgress, [0, 0.5], [0, 100]);
 
   const firstName = "Yash".split("");
   const lastName = "Patil".split("");
 
+  const socialLinks = [
+    { icon: FaGithub, href: "https://github.com/Yashpatil88", label: "GitHub", color: "from-gray-400 to-gray-600" },
+    { icon: FaLinkedin, href: "https://www.linkedin.com/in/yashspatil4779/", label: "LinkedIn", color: "from-blue-400 to-blue-600" },
+    { icon: FaEnvelope, href: "mailto:yashspatil4779@gmail.com", label: "Email", color: "from-purple-400 to-pink-600" }
+  ];
+
   return (
-    <section ref={ref} id="home" className="min-h-screen flex items-center justify-center relative overflow-hidden bg-gradient-to-b from-black to-gray-900">
-      <div className="absolute inset-0 w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-900/20 via-black to-black">
+    <section 
+      ref={ref} 
+      id="home" 
+      className="min-h-screen flex items-center justify-center relative overflow-hidden"
+    >
+      {/* Animated grid background */}
+      <div className="absolute inset-0 opacity-20">
+        <div className="absolute inset-0" style={{
+          backgroundImage: `
+            linear-gradient(rgba(59, 130, 246, 0.1) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(59, 130, 246, 0.1) 1px, transparent 1px)
+          `,
+          backgroundSize: '50px 50px',
+        }} />
         <motion.div
           className="absolute inset-0"
           animate={{
-            background: [
-              "radial-gradient(circle at 0% 0%, #00336680 0%, transparent 50%)",
-              "radial-gradient(circle at 100% 100%, #00336680 0%, transparent 50%)",
-              "radial-gradient(circle at 0% 100%, #00336680 0%, transparent 50%)",
-              "radial-gradient(circle at 100% 0%, #00336680 0%, transparent 50%)",
-              "radial-gradient(circle at 0% 0%, #00336680 0%, transparent 50%)",
-            ],
+            backgroundPosition: ['0% 0%', '100% 100%'],
           }}
           transition={{
-            duration: 10,
+            duration: 20,
             repeat: Infinity,
             repeatType: "reverse",
+            ease: "linear",
           }}
         />
       </div>
+
+      {/* Floating orbs */}
+      {[...Array(5)].map((_, i) => (
+        <motion.div
+          key={i}
+          className="absolute rounded-full blur-3xl opacity-20"
+          style={{
+            width: `${100 + i * 50}px`,
+            height: `${100 + i * 50}px`,
+            background: i % 2 === 0 
+              ? 'radial-gradient(circle, rgba(59, 130, 246, 0.4), transparent)'
+              : 'radial-gradient(circle, rgba(139, 92, 246, 0.4), transparent)',
+            left: `${20 + i * 15}%`,
+            top: `${10 + i * 20}%`,
+          }}
+          animate={{
+            x: [0, 30, 0],
+            y: [0, -30, 0],
+            scale: [1, 1.2, 1],
+          }}
+          transition={{
+            duration: 10 + i * 2,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+        />
+      ))}
       
       <motion.div 
         className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10"
-        style={{ opacity, scale, y }}
+        style={{ 
+          opacity, 
+          scale, 
+          y: yTransform,
+        }}
       >
-        <motion.div
-          variants={titleVariants}
-          initial="hidden"
-          animate="visible"
-          className="mb-8"
-        >
+        <div className="relative">
+          {/* Profile Image */}
           <motion.div 
-            initial={{ opacity: 0, scale: 0.5 }} 
-            animate={{ opacity: 1, scale: 1 }} 
-            transition={{ duration: 0.5 }}
-            className="relative w-48 h-48 mx-auto mb-8"
+            className="relative w-56 h-56 mx-auto mb-12"
           >
-            {/* Rotating gradient border */}
-            <motion.div
-              className="absolute -inset-4 rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500"
-              animate={{
-                background: [
-                  "linear-gradient(0deg, #3B82F6, #8B5CF6, #3B82F6)",
-                  "linear-gradient(360deg, #3B82F6, #8B5CF6, #3B82F6)",
-                ],
-                rotate: 360
-              }}
-              transition={{
-                duration: 10,
-                repeat: Infinity,
-                ease: "linear"
-              }}
-              style={{ filter: "blur(8px)" }}
-            />
+            {/* Glowing rings */}
+            {[...Array(3)].map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute inset-0 rounded-full border-2"
+                style={{
+                  borderColor: i === 0 ? 'rgba(59, 130, 246, 0.5)' : i === 1 ? 'rgba(139, 92, 246, 0.3)' : 'rgba(236, 72, 153, 0.2)',
+                  scale: 1 + i * 0.15,
+                  filter: 'blur(1px)',
+                }}
+                animate={{
+                  rotate: 360,
+                  scale: [1 + i * 0.15, 1.1 + i * 0.15, 1 + i * 0.15],
+                }}
+                transition={{
+                  duration: 20 + i * 5,
+                  repeat: Infinity,
+                  ease: "linear",
+                }}
+              />
+            ))}
             
             {/* Profile image container */}
             <motion.div
-              className="relative w-48 h-48 rounded-full overflow-hidden"
-              whileHover={{ scale: 1.05 }}
-              transition={{ duration: 0.3 }}
+              className="relative w-56 h-56 rounded-full overflow-hidden glass-strong border-4 border-transparent bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 p-1"
+              whileHover={{ scale: 1.05, rotateZ: 5 }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
             >
-              {/* Dark overlay on hover */}
-              <motion.div
-                className="absolute inset-0 bg-gradient-to-b from-transparent to-black/50 z-10"
-                initial={{ opacity: 0 }}
-                whileHover={{ opacity: 1 }}
-              />
-              
-              {/* Profile image */}
-              <Image
-                src="/images/profile.jpg"
-                alt="Yash Patil"
-                fill
-                style={{ objectFit: 'cover' }}
-                className="rounded-full"
-                sizes="(max-width: 768px) 192px, 192px"
-                priority
-              />
+              <div className="relative w-full h-full rounded-full overflow-hidden bg-black">
+                <Image
+                  src="/images/profile.jpg"
+                  alt="Yash Patil"
+                  fill
+                  style={{ objectFit: 'cover' }}
+                  className="rounded-full"
+                  sizes="224px"
+                  priority
+                />
+                {/* Shine effect */}
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/30 to-transparent"
+                  animate={{
+                    x: ['-200%', '200%'],
+                  }}
+                  transition={{
+                    duration: 3,
+                    repeat: Infinity,
+                    repeatDelay: 2,
+                    ease: "easeInOut",
+                  }}
+                  style={{
+                    transform: 'skewX(-45deg)',
+                  }}
+                />
+              </div>
+            </motion.div>
 
-              {/* Shine effect */}
+            {/* Floating particles around image */}
+            {[...Array(8)].map((_, i) => (
               <motion.div
-                className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/30 to-white/0"
+                key={i}
+                className="absolute w-2 h-2 rounded-full bg-blue-400"
+                style={{
+                  left: '50%',
+                  top: '50%',
+                  originX: 0.5,
+                  originY: 0.5,
+                }}
                 animate={{
-                  x: ["0%", "200%"],
+                  x: [0, Math.cos(i * Math.PI / 4) * 150],
+                  y: [0, Math.sin(i * Math.PI / 4) * 150],
+                  opacity: [0, 1, 0],
+                  scale: [0, 1, 0],
                 }}
                 transition={{
-                  duration: 2.5,
+                  duration: 3,
                   repeat: Infinity,
-                  repeatType: "loop",
+                  delay: i * 0.2,
                   ease: "easeInOut",
                 }}
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  mixBlendMode: "overlay",
-                  transform: "skewX(-45deg)",
-                }}
               />
-            </motion.div>
+            ))}
           </motion.div>
 
-          <h1 className="text-4xl sm:text-7xl font-bold text-white mb-4 flex justify-center items-center flex-wrap">
-            Hi, I'm{" "}
-            <div className="text-blue-500 ml-4 inline-flex flex-wrap">
-              <span className="inline-flex mr-4">
-                {firstName.map((letter, index) => (
-                  <motion.span
-                    key={`first-${index}`}
-                    variants={letterVariants}
-                    className="inline-block hover:text-blue-400 transition-colors duration-300 cursor-default"
-                    whileHover={{ y: -5, scale: 1.1, color: "#60A5FA" }}
-                  >
-                    {letter}
-                  </motion.span>
-                ))}
-              </span>
-              <span className="inline-flex">
-                {lastName.map((letter, index) => (
-                  <motion.span
-                    key={`last-${index}`}
-                    variants={letterVariants}
-                    className="inline-block hover:text-purple-400 transition-colors duration-300 cursor-default"
-                    whileHover={{ y: -5, scale: 1.1, color: "#C084FC" }}
-                  >
-                    {letter}
-                  </motion.span>
-                ))}
-              </span>
+          {/* Name with 3D effect */}
+          <motion.h1 
+            className="text-5xl sm:text-8xl font-bold mb-6 flex justify-center items-center flex-wrap gap-2"
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+          >
+            <span className="text-white">Hi, I'm</span>
+            <div className="inline-flex flex-wrap gap-2">
+              {firstName.map((letter, index) => (
+                <motion.span
+                  key={`first-${index}`}
+                  className="inline-block bg-gradient-to-r from-blue-400 via-blue-500 to-blue-600 bg-clip-text text-transparent"
+                  initial={{ opacity: 0, y: 50, rotateX: -90 }}
+                  animate={{ opacity: 1, y: 0, rotateX: 0 }}
+                  transition={{ 
+                    delay: 0.4 + index * 0.1,
+                    type: "spring",
+                    stiffness: 200,
+                    damping: 15,
+                  }}
+                  whileHover={{ 
+                    y: -10, 
+                    scale: 1.2,
+                    textShadow: "0 0 20px rgba(59, 130, 246, 0.8)",
+                  }}
+                  style={{
+                    transformStyle: 'preserve-3d',
+                  }}
+                >
+                  {letter === ' ' ? '\u00A0' : letter}
+                </motion.span>
+              ))}
+              {lastName.map((letter, index) => (
+                <motion.span
+                  key={`last-${index}`}
+                  className="inline-block bg-gradient-to-r from-purple-400 via-pink-500 to-purple-600 bg-clip-text text-transparent"
+                  initial={{ opacity: 0, y: 50, rotateX: -90 }}
+                  animate={{ opacity: 1, y: 0, rotateX: 0 }}
+                  transition={{ 
+                    delay: 0.7 + index * 0.1,
+                    type: "spring",
+                    stiffness: 200,
+                    damping: 15,
+                  }}
+                  whileHover={{ 
+                    y: -10, 
+                    scale: 1.2,
+                    textShadow: "0 0 20px rgba(139, 92, 246, 0.8)",
+                  }}
+                  style={{
+                    transformStyle: 'preserve-3d',
+                  }}
+                >
+                  {letter === ' ' ? '\u00A0' : letter}
+                </motion.span>
+              ))}
             </div>
-          </h1>
+          </motion.h1>
+
+          {/* Title with typing effect */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="text-xl sm:text-2xl text-gray-300 mb-8 space-y-2"
+            transition={{ delay: 1 }}
+            className="text-2xl sm:text-3xl mb-4"
           >
-            <motion.p
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.7 }}
+            <motion.span
+              className="inline-block bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent font-semibold"
+              animate={{
+                backgroundPosition: ['0%', '100%'],
+              }}
+              transition={{
+                duration: 3,
+                repeat: Infinity,
+                repeatType: "reverse",
+              }}
             >
-              <span className="text-blue-400">Computer Engineer</span>
-              {" "}<span className="text-gray-400">|</span>{" "}
-              <span className="text-purple-400">Author</span>
-            </motion.p>
-            <motion.p
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.9 }}
-              className="text-lg text-gray-400"
+              Computer Engineer
+            </motion.span>
+            <span className="text-gray-400 mx-4">|</span>
+            <motion.span
+              className="inline-block bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent font-semibold"
+              animate={{
+                backgroundPosition: ['0%', '100%'],
+              }}
+              transition={{
+                duration: 3,
+                repeat: Infinity,
+                repeatType: "reverse",
+                delay: 0.5,
+              }}
             >
-              Transforming ideas into elegant solutions
-            </motion.p>
+              Author
+            </motion.span>
           </motion.div>
+
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.2 }}
+            className="text-lg sm:text-xl text-gray-400 mb-12 max-w-2xl mx-auto"
+          >
+            Transforming ideas into <span className="text-blue-400 font-semibold">elegant solutions</span> through code and creativity
+          </motion.p>
           
+          {/* Social links with magnetic effect */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7 }}
-            className="flex justify-center space-x-6"
+            transition={{ delay: 1.4 }}
+            className="flex justify-center gap-6"
           >
-            {[
-              { icon: FaGithub, href: "https://github.com/Yashpatil88", label: "GitHub" },
-              { icon: FaLinkedin, href: "https://www.linkedin.com/in/yashspatil4779/", label: "LinkedIn" },
-              { icon: FaEnvelope, href: "mailto:yashspatil4779@gmail.com", label: "Email" }
-            ].map((social, index) => (
+            {socialLinks.map((social, index) => (
               <motion.a
                 key={social.label}
                 href={social.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                whileHover={{ scale: 1.1, y: -5 }}
+                className="relative group"
+                data-magnetic
+                initial={{ opacity: 0, scale: 0 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ 
+                  delay: 1.5 + index * 0.1,
+                  type: "spring",
+                  stiffness: 200,
+                  damping: 15,
+                }}
+                whileHover={{ scale: 1.2, y: -5 }}
                 whileTap={{ scale: 0.9 }}
-                className="group relative text-white hover:text-blue-500 transform transition-all duration-200"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.8 + index * 0.1 }}
               >
-                <social.icon className="h-8 w-8" />
-                <span className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 text-sm transition-opacity duration-200">
+                <div className={`relative w-16 h-16 rounded-2xl glass-strong flex items-center justify-center bg-gradient-to-br ${social.color} p-0.5`}>
+                  <div className="w-full h-full rounded-2xl bg-black/50 flex items-center justify-center backdrop-blur-sm">
+                    <social.icon className="w-6 h-6 text-white group-hover:scale-110 transition-transform duration-300" />
+                  </div>
+                </div>
+                <motion.span
+                  className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 text-sm text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap"
+                  initial={{ y: 10 }}
+                  whileHover={{ y: 0 }}
+                >
                   {social.label}
-                </span>
+                </motion.span>
               </motion.a>
             ))}
           </motion.div>
-        </motion.div>
+        </div>
       </motion.div>
       
+      {/* Scroll indicator */}
       <motion.div
         className="absolute bottom-10 left-1/2 transform -translate-x-1/2"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 1 }}
+        transition={{ delay: 2 }}
       >
         <motion.div
           animate={{
@@ -246,20 +347,21 @@ const Hero = () => {
           onClick={() => {
             document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' });
           }}
+          data-magnetic
         >
-          <svg
-            className="h-6 w-6"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M19 14l-7 7m0 0l-7-7m7 7V3"
+          <div className="w-6 h-10 rounded-full border-2 border-white/30 flex items-start justify-center p-2">
+            <motion.div
+              className="w-1.5 h-1.5 rounded-full bg-white"
+              animate={{
+                y: [0, 12, 0],
+              }}
+              transition={{
+                duration: 1.5,
+                repeat: Infinity,
+                repeatType: "reverse",
+              }}
             />
-          </svg>
+          </div>
         </motion.div>
       </motion.div>
     </section>
