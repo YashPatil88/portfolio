@@ -89,7 +89,10 @@ const About = () => {
         />
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full" style={{ opacity }}>
+      <motion.div 
+        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full"
+        style={{ opacity }}
+      >
         {/* Section Header */}
         <motion.div
           initial={{ opacity: 0, y: 50 }}
@@ -222,13 +225,13 @@ const About = () => {
                   initial={{ opacity: 0, scale: 0 }}
                   whileInView={{ opacity: 1, scale: 1 }}
                   viewport={{ once: true }}
-                  transition={{ delay: 1 + index * 0.2 }}
                   animate={{
                     x: Math.cos(angle) * radius,
                     y: Math.sin(angle) * radius,
                     rotate: 360,
                   }}
                   transition={{
+                    delay: 1 + index * 0.2,
                     x: { duration: 10 + index * 2, repeat: Infinity, ease: "easeInOut" },
                     y: { duration: 10 + index * 2, repeat: Infinity, ease: "easeInOut" },
                     rotate: { duration: 20, repeat: Infinity, ease: "linear" },
@@ -475,7 +478,7 @@ const About = () => {
             </motion.div>
           </div>
         </motion.div>
-      </div>
+      </motion.div>
     </section>
   );
 };

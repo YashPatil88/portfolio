@@ -88,7 +88,10 @@ const Technologies = () => {
         />
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full" style={{ opacity }}>
+      <motion.div 
+        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full"
+        style={{ opacity }}
+      >
         {/* Section Header */}
         <motion.div
           initial={{ opacity: 0, y: 50 }}
@@ -243,7 +246,7 @@ const Technologies = () => {
             );
           })}
         </div>
-      </div>
+      </motion.div>
     </section>
   );
 };
